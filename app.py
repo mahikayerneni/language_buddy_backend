@@ -48,7 +48,7 @@ def index():
 def health():
     return jsonify({
         "status": "✅ Flask is running",
-        "openai_available": OPENAI_API_KEY is not None
+        "openai_available": bool(OPENAI_API_KEY)
     })
 
 @app.route("/register", methods=["POST"])
@@ -62,7 +62,6 @@ def register():
             return jsonify({"error": "Email and password required"}), 400
 
         hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-        # Fake DB replacement: just return success
         return jsonify({"message": "User registered (not stored)", "email": email}), 200
 
     except Exception as e:
@@ -79,7 +78,6 @@ def login():
         if not email or not password:
             return jsonify({"error": "Email and password required"}), 400
 
-        # Fake password match
         fake_hashed_pw = bcrypt.hashpw("password123".encode('utf-8'), bcrypt.gensalt())
         if not bcrypt.checkpw(password.encode('utf-8'), fake_hashed_pw):
             return jsonify({"error": "Invalid credentials"}), 401
@@ -90,7 +88,7 @@ def login():
     except Exception as e:
         logging.exception("Login failed")
         return jsonify({"error": "Login error"}), 500
-        
+
 @app.route("/chat", methods=["POST"])
 def chat():
     try:
@@ -118,9 +116,10 @@ def chat():
         logging.exception("Error during chat completion")
         return jsonify({"error": "Failed to get response from OpenAI"}), 500
 
-
-
 # === Run App ===
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
 
+    
+        
+        
