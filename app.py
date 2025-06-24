@@ -101,6 +101,9 @@ def chat():
 
         logging.info(f"Sending to Groq: {user_message}")
 
+        print(f"🔑 Using Groq API Key: {GROQ_API_KEY}")
+
+
         response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
