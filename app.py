@@ -90,7 +90,7 @@ def login():
         logging.exception("Login failed")
         return jsonify({"error": "Login error"}), 500
 
-@app.route("/chat", methods=["POST,"OPTIONS"])
+@app.route("/chat", methods=["POST","OPTIONS"])
 def chat():
     try:
         data = request.get_json()
