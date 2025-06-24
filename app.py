@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 import jwt
 import datetime
 import bcrypt
-import openai  
+import openai
 
 from flask_cors import CORS
 import os
@@ -23,15 +23,17 @@ CORS(app, resources={r"/*": {"origins": [
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
-
+# Set OpenAI API key for SDK v0.x
 openai.api_key = OPENAI_API_KEY
 
-# Initialize OpenAI client
-try:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-except Exception as e:
-    logging.error(f"Failed to initialize OpenAI client: {str(e)}")
-    client = None
+# Optional: basic health check
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "✅ Flask is running",
+        "openai_available": OPENAI_API_KEY is not None
+    })
+
 
 # JWT helpers
 def generate_jwt(user_id):
