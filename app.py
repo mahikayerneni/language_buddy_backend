@@ -4,8 +4,8 @@ import os
 import jwt
 import datetime
 import bcrypt
+import requests
 import logging
-import google.generativeai as genai
 
 # === Logging Setup ===
 logging.basicConfig(filename="language_buddy.log", level=logging.DEBUG)
@@ -21,8 +21,7 @@ CORS(app, origins=[
 
 # === Load Env Vars ===
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-genai.configure(api_key=GOOGLE_API_KEY)
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 
 # === JWT Helpers ===
 def generate_jwt(user_id):
@@ -42,7 +41,6 @@ def verify_jwt(token):
         return None
 
 # === Routes ===
-
 @app.route("/", methods=["GET"])
 def index():
     return jsonify({"message": "Welcome to Language Buddy Backend!"})
@@ -51,7 +49,7 @@ def index():
 def health():
     return jsonify({
         "status": "✅ Flask is running",
-        "gemini_available": bool(GOOGLE_API_KEY)
+        "groq_available": bool(GROQ_API_KEY)
     })
 
 @app.route("/register", methods=["POST"])
@@ -101,23 +99,34 @@ def chat():
         if not user_message:
             return jsonify({"error": "No message provided"}), 400
 
-        print("✅ Sending to Gemini:", user_message)
-        model = genai.GenerativeModel("gemini-pro")
-        response = model.generate_content(user_message)
+        logging.info(f"Sending to Groq: {user_message}")
 
-        reply = response.text.strip()
-        print("🤖 Gemini replied:", reply)
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama3-70b-8192",
+                "messages": [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": user_message}
+                ]
+            }
+        )
+
+        if response.status_code != 200:
+            logging.error(f"Groq API Error: {response.text}")
+            return jsonify({"error": "Groq API call failed"}), 500
+
+        reply = response.json()["choices"][0]["message"]["content"]
+        logging.info(f"Groq response: {reply}")
         return jsonify({"reply": reply})
 
     except Exception as e:
-        logging.exception("Gemini API error")
-        return jsonify({"error": "Failed to get response from Gemini"}), 500
+        logging.exception("Groq API error")
+        return jsonify({"error": "Failed to get response from Groq"}), 500
 
 # === Run App ===
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
-
-
-    
-        
-        
