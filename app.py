@@ -6,22 +6,20 @@ from openai import OpenAI
 from flask_cors import CORS
 import os
 import logging
-import traceback
-from pymongo import MongoClient
 
 # Set up logging
 logging.basicConfig(filename="language_buddy.log", level=logging.DEBUG)
 
 # Initialize Flask app
 app = Flask(__name__)
+
+# Allow frontend hosted on S3
 CORS(app, resources={r"/*": {"origins": [
-    "https://mahika6.pythonanywhere.com",
     "http://language-buddy.s3-website.ap-south-1.amazonaws.com"
 ]}}, supports_credentials=True)
 
 # Load environment variables
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://yernenimahika:8gg0Rw6dTpUW39IO@cluster0.w12xvvr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'default_secret')
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # Initialize OpenAI client
@@ -48,88 +46,88 @@ def verify_jwt(token):
     except jwt.InvalidTokenError:
         return None
 
-# Health check
+# Temporary in-memory user storage
+users = {}
+
+# Health check route
 @app.route("/health", methods=["GET"])
 def health():
-    try:
-        db_status = "Unavailable"
-        db_error = None
-        try:
-            mongo_client = MongoClient(MONGO_URI)
-            mongo_client.admin.command('ping')
-            db_status = "Available"
-        except Exception as db_err:
-            db_error = str(db_err)
-
-        return jsonify({
-            "status": "✅ Flask is running",
-            "db_status": db_status,
-            "db_error": db_error,
-            "openai_available": client is not None
-        }), 200
-
-    except Exception as e:
-        return jsonify({
-            "status": "❌ Error",
-            "error": str(e)
-        }), 500
+    return jsonify({
+        "status": "✅ Flask is running",
+        "openai_available": client is not None
+    })
 
 @app.route("/", methods=["GET"])
 def index():
     return jsonify({"message": "Welcome to Language Buddy Backend!"})
 
-@app.route("/favicon.ico")
-def favicon():
-    return '', 204
-
 @app.route("/register", methods=["POST"])
 def register():
     try:
-        data = request.get_json()
-        username = data["username"]
-        password = data["password"]
+        data = request.json
+        username = data.get("username")
+        password = data.get("password")
         email = data.get("email", "")
 
-        mongo_client = MongoClient(MONGO_URI)
-        db = mongo_client["language_buddy"]
-        users_collection = db["users"]
+        if not username or not password:
+            return jsonify({"error": "Username and password are required"}), 400
 
-        if users_collection.find_one({"username": username}):
-            return jsonify({"error": "Username already exists"}), 400
+        if username in users:
+            return jsonify({"error": "User already exists"}), 400
 
-        hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
-        users_collection.insert_one({
-            "username": username,
-            "password": hashed_pw,
-            "email": email
-        })
+        hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        users[username] = {"password": hashed_pw, "email": email}
+        return jsonify({"message": "Registration successful"}), 200
 
-        return jsonify({"message": "User registered successfully"}), 200
     except Exception as e:
-        logging.error(traceback.format_exc())
-        return jsonify({"error": "Registration failed"}), 500
+        logging.error(f"Register error: {str(e)}")
+        return jsonify({"error": "Server error"}), 500
 
 @app.route("/login", methods=["POST"])
 def login():
     try:
-        data = request.get_json()
-        username = data["username"]
-        password = data["password"]
+        data = request.json
+        username = data.get("username")
+        password = data.get("password")
 
-        mongo_client = MongoClient(MONGO_URI)
-        db = mongo_client["language_buddy"]
-        users_collection = db["users"]
-
-        user = users_collection.find_one({"username": username})
-        if user and bcrypt.checkpw(password.encode("utf-8"), user["password"]):
-            token = generate_jwt(str(user["_id"]))
-            return jsonify({"token": token, "username": username, "message": "Login successful"}), 200
-        else:
+        user = users.get(username)
+        if not user or not bcrypt.checkpw(password.encode('utf-8'), user["password"]):
             return jsonify({"error": "Invalid username or password"}), 401
+
+        token = generate_jwt(username)
+        return jsonify({"message": "Login successful", "token": token, "username": username}), 200
+
     except Exception as e:
-        logging.error(traceback.format_exc())
-        return jsonify({"error": "Login failed"}), 500
+        logging.error(f"Login error: {str(e)}")
+        return jsonify({"error": "Server error"}), 500
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    try:
+        token = request.headers.get("Authorization", "").replace("Bearer ", "")
+        user_id = verify_jwt(token)
+        if not user_id:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        message = request.json.get("message")
+        if not message:
+            return jsonify({"error": "Empty message"}), 400
+
+        if not client:
+            return jsonify({"error": "OpenAI not available"}), 503
+
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": message}]
+        )
+
+        reply = response.choices[0].message.content
+        return jsonify({"response": reply}), 200
+
+    except Exception as e:
+        logging.error(f"Chat error: {str(e)}")
+        return jsonify({"error": "Server error"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port)
