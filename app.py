@@ -90,6 +90,7 @@ def login():
         return jsonify({"error": "Login error"}), 500
 
 @app.route("/chat", methods=["POST"])
+@app.route("/chat", methods=["POST"])
 def chat():
     try:
         data = request.get_json()
@@ -98,7 +99,7 @@ def chat():
         if not user_message:
             return jsonify({"error": "No message provided"}), 400
 
-        logging.info(f"Received message: {user_message}")
+        print("✅ Sending to OpenAI:", user_message)
 
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -109,11 +110,11 @@ def chat():
         )
 
         assistant_message = response['choices'][0]['message']['content']
-        logging.info(f"Assistant response: {assistant_message}")
+        print("🤖 Assistant replied:", assistant_message)
         return jsonify({"reply": assistant_message})
 
     except Exception as e:
-        logging.exception("Error during chat completion")
+        print("🔥 ERROR calling OpenAI:", str(e))  # << This will show up in Render logs
         return jsonify({"error": "Failed to get response from OpenAI"}), 500
 
 # === Run App ===
