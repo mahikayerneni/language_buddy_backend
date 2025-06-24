@@ -90,36 +90,35 @@ def login():
     except Exception as e:
         logging.exception("Login failed")
         return jsonify({"error": "Login error"}), 500
-
+        
 @app.route("/chat", methods=["POST"])
 def chat():
-    logging.info("🟢 /chat route triggered")
-
-    if not OPENAI_API_KEY:
-        logging.error("❌ OpenAI API key missing")
-        return jsonify({"error": "OpenAI API not configured"}), 503
-
     try:
         data = request.get_json()
-        message = data.get("message", "").strip()
+        user_message = data.get("message")
 
-        if not message:
-            return jsonify({"error": "Message is required"}), 400
+        if not user_message:
+            return jsonify({"error": "No message provided"}), 400
+
+        logging.info(f"Received message: {user_message}")
 
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a helpful language buddy."},
-                {"role": "user", "content": message}
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": user_message}
             ]
         )
 
-        reply = response.choices[0].message.content.strip()
-        return jsonify({"reply": reply})
+        assistant_message = response['choices'][0]['message']['content']
+        logging.info(f"Assistant response: {assistant_message}")
+        return jsonify({"reply": assistant_message})
 
     except Exception as e:
-        logging.exception("❌ Chat error")
-        return jsonify({"error": "Chat failed"}), 500
+        logging.exception("Error during chat completion")
+        return jsonify({"error": "Failed to get response from OpenAI"}), 500
+
+
 
 # === Run App ===
 if __name__ == "__main__":
