@@ -22,6 +22,9 @@ CORS(app, resources={r"/*": {"origins": [
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
+
+openai.api_key = OPENAI_API_KEY
+
 # Initialize OpenAI client
 try:
     client = OpenAI(api_key=OPENAI_API_KEY)
