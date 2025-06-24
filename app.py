@@ -2,7 +2,8 @@ from flask import Flask, request, jsonify
 import jwt
 import datetime
 import bcrypt
-from openai import OpenAI
+import openai  
+
 from flask_cors import CORS
 import os
 import logging
