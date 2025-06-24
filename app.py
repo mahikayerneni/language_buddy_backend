@@ -12,10 +12,13 @@ logging.basicConfig(filename="language_buddy.log", level=logging.DEBUG)
 
 # === Flask App Setup ===
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": [
-    "http://language-buddy.s3-website.ap-south-1.amazonaws.com"
+
+# Allow S3 frontend origins
+CORS(app, origins=[
+    "http://language-buddy.s3-website.ap-south-1.amazonaws.com",
     "https://language-buddy.s3-website.ap-south-1.amazonaws.com"
-]}}, supports_credentials=True)
+])
+
 
 # === Load Env Vars ===
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
