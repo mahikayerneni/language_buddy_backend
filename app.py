@@ -100,30 +100,31 @@ def login():
 
 @app.route("/chat", methods=["POST"])
 def chat():
+    if not OPENAI_API_KEY:
+        return jsonify({"error": "OpenAI API key missing"}), 500
+
     try:
-        token = request.headers.get("Authorization", "").replace("Bearer ", "")
-        user_id = verify_jwt(token)
-        if not user_id:
-            return jsonify({"error": "Unauthorized"}), 401
+        data = request.get_json()
+        message = data.get("message", "").strip()
 
-        message = request.json.get("message")
         if not message:
-            return jsonify({"error": "Empty message"}), 400
+            return jsonify({"error": "No message provided"}), 400
 
-        if not client:
-            return jsonify({"error": "OpenAI not available"}), 503
-
-        response = client.chat.completions.create(
+        # Safe OpenAI call
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": message}]
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": message}
+            ]
         )
 
-        reply = response.choices[0].message.content
-        return jsonify({"response": reply}), 200
+        reply = response.choices[0].message.content.strip()
+        return jsonify({"reply": reply})
 
     except Exception as e:
-        logging.error(f"Chat error: {str(e)}")
-        return jsonify({"error": "Server error"}), 500
+        logging.error("OpenAI error: %s", str(e))
+        return jsonify({"error": "Something went wrong on the server"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
