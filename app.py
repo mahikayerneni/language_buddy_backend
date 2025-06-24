@@ -4,8 +4,8 @@ import os
 import jwt
 import datetime
 import bcrypt
-import openai
 import logging
+import google.generativeai as genai
 
 # === Logging Setup ===
 logging.basicConfig(filename="language_buddy.log", level=logging.DEBUG)
@@ -19,11 +19,10 @@ CORS(app, origins=[
     "https://language-buddy.s3-website.ap-south-1.amazonaws.com"
 ])
 
-
 # === Load Env Vars ===
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-openai.api_key = OPENAI_API_KEY
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+genai.configure(api_key=GOOGLE_API_KEY)
 
 # === JWT Helpers ===
 def generate_jwt(user_id):
@@ -52,7 +51,7 @@ def index():
 def health():
     return jsonify({
         "status": "✅ Flask is running",
-        "openai_available": bool(OPENAI_API_KEY)
+        "gemini_available": bool(GOOGLE_API_KEY)
     })
 
 @app.route("/register", methods=["POST"])
@@ -94,7 +93,6 @@ def login():
         return jsonify({"error": "Login error"}), 500
 
 @app.route("/chat", methods=["POST"])
-@app.route("/chat", methods=["POST"])
 def chat():
     try:
         data = request.get_json()
@@ -103,27 +101,22 @@ def chat():
         if not user_message:
             return jsonify({"error": "No message provided"}), 400
 
-        print("✅ Sending to OpenAI:", user_message)
+        print("✅ Sending to Gemini:", user_message)
+        model = genai.GenerativeModel("gemini-pro")
+        response = model.generate_content(user_message)
 
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": user_message}
-            ]
-        )
-
-        assistant_message = response['choices'][0]['message']['content']
-        print("🤖 Assistant replied:", assistant_message)
-        return jsonify({"reply": assistant_message})
+        reply = response.text.strip()
+        print("🤖 Gemini replied:", reply)
+        return jsonify({"reply": reply})
 
     except Exception as e:
-        print("🔥 ERROR calling OpenAI:", str(e))  # << This will show up in Render logs
-        return jsonify({"error": "Failed to get response from OpenAI"}), 500
+        logging.exception("Gemini API error")
+        return jsonify({"error": "Failed to get response from Gemini"}), 500
 
 # === Run App ===
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
+
 
     
         
