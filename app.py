@@ -21,8 +21,7 @@ CORS(app, resources={r"/*": {"origins": [
 
 # Load environment variables
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://yernenimahika:8gg0Rw6dTpUW39IO@cluster0.w12xvvr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-
-JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'default_secret')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # Initialize OpenAI client
@@ -79,7 +78,57 @@ def health():
 def index():
     return jsonify({"message": "Welcome to Language Buddy Backend!"})
 
-# You can keep or reimplement endpoints like /chat, /register, /login, etc. using MongoDB
+@app.route("/favicon.ico")
+def favicon():
+    return '', 204
+
+@app.route("/register", methods=["POST"])
+def register():
+    try:
+        data = request.get_json()
+        username = data["username"]
+        password = data["password"]
+        email = data.get("email", "")
+
+        mongo_client = MongoClient(MONGO_URI)
+        db = mongo_client["language_buddy"]
+        users_collection = db["users"]
+
+        if users_collection.find_one({"username": username}):
+            return jsonify({"error": "Username already exists"}), 400
+
+        hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+        users_collection.insert_one({
+            "username": username,
+            "password": hashed_pw,
+            "email": email
+        })
+
+        return jsonify({"message": "User registered successfully"}), 200
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        return jsonify({"error": "Registration failed"}), 500
+
+@app.route("/login", methods=["POST"])
+def login():
+    try:
+        data = request.get_json()
+        username = data["username"]
+        password = data["password"]
+
+        mongo_client = MongoClient(MONGO_URI)
+        db = mongo_client["language_buddy"]
+        users_collection = db["users"]
+
+        user = users_collection.find_one({"username": username})
+        if user and bcrypt.checkpw(password.encode("utf-8"), user["password"]):
+            token = generate_jwt(str(user["_id"]))
+            return jsonify({"token": token, "username": username, "message": "Login successful"}), 200
+        else:
+            return jsonify({"error": "Invalid username or password"}), 401
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        return jsonify({"error": "Login failed"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
