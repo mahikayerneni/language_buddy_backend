@@ -26,15 +26,6 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 # Set OpenAI API key for SDK v0.x
 openai.api_key = OPENAI_API_KEY
 
-# Optional: basic health check
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({
-        "status": "✅ Flask is running",
-        "openai_available": OPENAI_API_KEY is not None
-    })
-
-
 # JWT helpers
 def generate_jwt(user_id):
     payload = {
